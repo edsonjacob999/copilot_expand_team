@@ -568,6 +568,10 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         `
         }
+        <button class="share-button tooltip" data-activity="${name}" aria-label="Share this activity">
+          🔗 Share
+          <span class="tooltip-text">Share this activity with friends</span>
+        </button>
       </div>
     `;
 
@@ -586,6 +590,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
     }
+
+    // Add click handler for share button
+    const shareButton = activityCard.querySelector(".share-button");
+    shareButton.addEventListener("click", () => {
+      shareActivity(name, details.description);
+    });
 
     activitiesList.appendChild(activityCard);
   }
@@ -855,6 +865,68 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Share an activity using Web Share API or clipboard fallback
+  async function shareActivity(name, description) {
+    const shareUrl =
+      window.location.origin +
+      window.location.pathname +
+      "?activity=" +
+      encodeURIComponent(name);
+    const shareData = {
+      title: `${name} – Mergington High School`,
+      text: `Check out this activity: ${name}\n${description}`,
+      url: shareUrl,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          copyToClipboard(shareUrl);
+        }
+      }
+    } else {
+      copyToClipboard(shareUrl);
+    }
+  }
+
+  // Copy text to clipboard and show confirmation
+  function copyToClipboard(text) {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => showMessage("Link copied to clipboard!", "success"))
+      .catch(() =>
+        showMessage(
+          "Could not copy link. Please check browser permissions or copy manually.",
+          "error"
+        )
+      );
+  }
+
+  // Highlight a shared activity from the URL parameter
+  function handleSharedActivity() {
+    const params = new URLSearchParams(window.location.search);
+    const sharedActivity = params.get("activity");
+    if (!sharedActivity) return;
+
+    // Wait for activities to render, then scroll to and highlight the card
+    const observer = new MutationObserver(() => {
+      const cards = activitiesList.querySelectorAll(".activity-card");
+      cards.forEach((card) => {
+        const title = card.querySelector("h4");
+        if (title && title.textContent.trim() === sharedActivity) {
+          card.classList.add("highlighted-activity");
+          card.scrollIntoView({ behavior: "smooth", block: "center" });
+          observer.disconnect();
+        }
+      });
+    });
+    observer.observe(activitiesList, { childList: true, subtree: true });
+    // Disconnect observer after 10 seconds to avoid indefinite observation
+    setTimeout(() => observer.disconnect(), 10000);
+  }
+
   // Expose filter functions to window for future UI control
   window.activityFilters = {
     setDayFilter,
@@ -865,4 +937,5 @@ document.addEventListener("DOMContentLoaded", () => {
   checkAuthentication();
   initializeFilters();
   fetchActivities();
+  handleSharedActivity();
 });
